@@ -11,6 +11,10 @@ class McFastBurguerApp:
         self.root.geometry("800x600")  # Define um tamanho inicial mediano para a janela
         self.mc_fast_burguer = McFastBurguer()
         self.pedido_atual = []  # Lista para manter todos os itens do pedido atual
+        self.mc_fast_burguer = McFastBurguer()
+        self.pedido_atual = []  # Lista para manter todos os itens do pedido atual
+        self.estoque = {}  # Dicionário para controle de estoque
+        self.saidas = []  # Lista para registrar as saídas
 
         # Tema escuro
         self.root.configure(bg="#333333")
@@ -76,12 +80,82 @@ class McFastBurguerApp:
         btn_controle = tk.Button(self.frame_menu_lateral, text="Abrir Controle de Pedidos", command=self.abrir_janela_controle)
         btn_controle.pack(pady=10)
 
+        btn_estoque = tk.Button(self.frame_menu_lateral, text="Estoque", command=self.abrir_tela_estoque)
+        btn_estoque.pack(pady=10)
+
+        btn_saidas = tk.Button(self.frame_menu_lateral, text="Saídas", command=self.abrir_tela_saidas)
+        btn_saidas.pack(pady=10)
+
         btn_fechar_menu = tk.Button(self.frame_menu_lateral, text="Fechar Menu", command=self.fechar_menu_lateral)
         btn_fechar_menu.pack(pady=10)
 
     def fechar_menu_lateral(self):
         """Fecha o menu lateral."""
         self.frame_menu_lateral.destroy()
+    def abrir_tela_estoque(self):
+        """Abre a tela de controle de estoque."""
+        janela_estoque = Toplevel(self.root)
+        janela_estoque.title("Controle de Estoque")
+
+        label = tk.Label(janela_estoque, text="Controle de Estoque", font=("Helvetica", 16))
+        label.pack(pady=10)
+
+        tabela_estoque = ttk.Treeview(janela_estoque, columns=("Quantidade"), show="headings")
+        tabela_estoque.heading("Quantidade", text="Quantidade")
+        tabela_estoque.pack(fill=tk.BOTH, expand=True)
+
+        for item, quantidade in self.estoque.items():
+            tabela_estoque.insert("", tk.END, values=(item, quantidade))
+
+        def adicionar_item():
+            nome_item = simpledialog.askstring("Adicionar Item", "Nome do item:")
+            if not nome_item:
+                return
+
+            quantidade = simpledialog.askinteger("Quantidade", f"Quantidade para {nome_item}:")
+            if not quantidade or quantidade <= 0:
+                return
+
+            self.estoque[nome_item] = self.estoque.get(nome_item, 0) + quantidade
+            tabela_estoque.insert("", tk.END, values=(nome_item, quantidade))
+
+        btn_adicionar = tk.Button(janela_estoque, text="Adicionar Item", command=adicionar_item)
+        btn_adicionar.pack(pady=5)
+
+    def abrir_tela_saidas(self):
+        """Abre a tela de controle de saídas."""
+        janela_saidas = Toplevel(self.root)
+        janela_saidas.title("Controle de Saídas")
+
+        label = tk.Label(janela_saidas, text="Controle de Saídas", font=("Helvetica", 16))
+        label.pack(pady=10)
+
+        tabela_saidas = ttk.Treeview(janela_saidas, columns=("Descrição", "Valor", "Data", "Hora"), show="headings")
+        tabela_saidas.heading("Descrição", text="Descrição")
+        tabela_saidas.heading("Valor", text="Valor")
+        tabela_saidas.heading("Data", text="Data")
+        tabela_saidas.heading("Hora", text="Hora")
+        tabela_saidas.pack(fill=tk.BOTH, expand=True)
+
+        for saida in self.saidas:
+            tabela_saidas.insert("", tk.END, values=saida)
+
+        def adicionar_saida():
+            descricao = simpledialog.askstring("Adicionar Saída", "Descrição da saída:")
+            if not descricao:
+                return
+
+            valor = simpledialog.askfloat("Valor", f"Valor para {descricao}:")
+            if not valor or valor <= 0:
+                return
+
+            data = datetime.datetime.now().strftime('%d/%m/%Y')
+            hora = datetime.datetime.now().strftime('%H:%M:%S')
+            self.saidas.append((descricao, valor, data, hora))
+            tabela_saidas.insert("", tk.END, values=(descricao, valor, data, hora))
+
+        btn_adicionar = tk.Button(janela_saidas, text="Adicionar Saída", command=adicionar_saida)
+        btn_adicionar.pack(pady=5)
 
     def abrir_janela_controle(self):
         """Abre uma nova janela para controle dos pedidos."""
@@ -361,38 +435,36 @@ class McFastBurguerApp:
         self._atualizar_pedido()
         messagebox.showinfo("Pedido Finalizado", f"Total do pedido: R$ {total:.2f}")
     def gerar_relatorio(self):
-            """Exibe o relatório de vendas e permite copiar o texto."""
-            if not self.mc_fast_burguer.pedidos:
-                messagebox.showinfo("Relatório", "Nenhum pedido foi registrado.")
-                return
+        """Exibe o relatório de vendas e inclui estoque e saídas."""
+        if not self.mc_fast_burguer.pedidos:
+            messagebox.showinfo("Relatório", "Nenhum pedido foi registrado.")
+            return
 
-            # Gera o relatório com base nos pedidos
-            relatorio = self.mc_fast_burguer.gerar_relatorio()
+        relatorio = "----- Relatório de Vendas -----\n"
+        relatorio += self.mc_fast_burguer.gerar_relatorio()
 
-            # Cria uma nova janela para exibir o relatório
-            relatorio_window = Toplevel(self.root)
-            relatorio_window.title("Relatório de Vendas")
+        relatorio += "\n--- Controle de Estoque ---\n"
+        for item, quantidade in self.estoque.items():
+            relatorio += f"{item:<30} Quantidade: {quantidade}\n"
 
-            # Campo de texto para exibir o relatório
-            text_area = tk.Text(relatorio_window, wrap=tk.WORD, width=80, height=25)
-            text_area.insert("1.0", relatorio)
-            text_area.config(state=tk.DISABLED)  # Apenas leitura
-            text_area.pack(padx=10, pady=10)
+        relatorio += "\n--- Controle de Saídas ---\n"
+        total_saidas = 0
+        for descricao, valor, data, hora in self.saidas:
+            relatorio += f"{data} {hora:<8} {descricao:<30} R$ {valor:.2f}\n"
+            total_saidas += valor
 
-            # Função para copiar o texto do relatório
-            def copiar_para_area_transferencia():
-                self.root.clipboard_clear()
-                self.root.clipboard_append(relatorio)
-                self.root.update()  # Atualiza a área de transferência
-                messagebox.showinfo("Copiado", "Relatório copiado para a área de transferência!")
+        relatorio += f"\nTotal de Saídas: R$ {total_saidas:.2f}\n"
 
-            # Botão para copiar o relatório
-            btn_copiar = tk.Button(relatorio_window, text="Copiar Relatório", command=copiar_para_area_transferencia)
-            btn_copiar.pack(pady=5)
+        relatorio_window = Toplevel(self.root)
+        relatorio_window.title("Relatório Final")
 
-            # Botão para fechar a janela
-            btn_fechar = tk.Button(relatorio_window, text="Fechar", command=relatorio_window.destroy)
-            btn_fechar.pack(pady=5)
+        text_area = tk.Text(relatorio_window, wrap=tk.WORD, width=80, height=25)
+        text_area.insert("1.0", relatorio)
+        text_area.config(state=tk.DISABLED)
+        text_area.pack(padx=10, pady=10)
+
+        btn_fechar = tk.Button(relatorio_window, text="Fechar", command=relatorio_window.destroy)
+        btn_fechar.pack(pady=5)
 
 
 
